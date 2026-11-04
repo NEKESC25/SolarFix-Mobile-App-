@@ -1,0 +1,6 @@
+{
+  "name": "Solarfix",
+  "description": "AI Solar Technician, Solar Hardware Marketplace, and Energy Analytics Dashboard",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

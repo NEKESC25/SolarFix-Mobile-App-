@@ -1,0 +1,299 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions (Zero-Trust Security Architecture)
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isVerifiedAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.isAdmin == true ||
+        (request.auth.token.email_verified == true && (
+          request.auth.token.email == "nekeskingsley@gmail.com" ||
+          request.auth.token.email == "admin@solarfix.africa"
+        )) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true)
+      );
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    // PCI-DSS & Sensitive Credential Non-Storage Guard:
+    // Rejects any document containing raw card numbers (PAN), CVVs, PINs, or banking passwords.
+    function hasNoProhibitedPaymentSecrets(data) {
+      return !data.keys().hasAny([
+        'cardNumber', 'card_number', 'pan', 'creditCard', 'debitCard',
+        'cvv', 'cvc', 'cvv2', 'cvc2', 'cid', 'securityCode',
+        'cardPin', 'card_pin', 'pinBlock', 'bankingPassword', 'banking_password', 'bvnSecret'
+      ]);
+    }
+
+    // ===============================================================
+    // Users Collection (/users/{userId})
+    // ===============================================================
+    match /users/{userId} {
+      // Row-Level Security: Users can read only their own profile; Admins can read all profiles
+      allow read: if isOwner(userId) || isVerifiedAdmin();
+
+      // Prevent self-promotion to Admin on creation & block prohibited fields
+      allow create: if isOwner(userId)
+        && hasNoProhibitedPaymentSecrets(request.resource.data)
+        && request.resource.data.keys().hasAll(['uid', 'name', 'email', 'role', 'isAdmin'])
+        && request.resource.data.uid == userId
+        && isValidString(request.resource.data.name, 2, 120)
+        && isValidString(request.resource.data.email, 5, 254)
+        && (
+          isVerifiedAdmin() || (
+            request.resource.data.isAdmin == false &&
+            request.resource.data.role in ['CUSTOMER', 'TECHNICIAN', 'VERIFIED_SELLER']
+          )
+        );
+
+      // Prevent privilege escalation on profile update
+      allow update: if hasNoProhibitedPaymentSecrets(request.resource.data) && (
+        (isOwner(userId)
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.isAdmin == resource.data.isAdmin
+          && request.resource.data.role == resource.data.role)
+        || isVerifiedAdmin()
+      );
+
+      allow delete: if isVerifiedAdmin();
+
+      // User-scoped Delivery Addresses Subcollection (/users/{userId}/addresses/{addressId})
+      match /addresses/{addressId} {
+        allow read, create, update, delete: if isOwner(userId) || isVerifiedAdmin();
+      }
+    }
+
+    // ===============================================================
+    // Customer Delivery Addresses Collection (/addresses/{addressId})
+    // ===============================================================
+    match /addresses/{addressId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userUid == request.auth.uid ||
+        isVerifiedAdmin()
+      );
+
+      allow create: if isAuthenticated()
+        && hasNoProhibitedPaymentSecrets(request.resource.data)
+        && request.resource.data.userUid == request.auth.uid
+        && isValidString(request.resource.data.recipientName, 2, 120)
+        && isValidString(request.resource.data.streetAddress, 3, 250);
+
+      allow update: if isAuthenticated()
+        && hasNoProhibitedPaymentSecrets(request.resource.data)
+        && resource.data.userUid == request.auth.uid
+        && request.resource.data.userUid == resource.data.userUid;
+
+      allow delete: if isAuthenticated() && (
+        resource.data.userUid == request.auth.uid ||
+        isVerifiedAdmin()
+      );
+    }
+
+    // ===============================================================
+    // Seller Stores Collection (/stores/{storeId})
+    // ===============================================================
+    match /stores/{storeId} {
+      // Approved public store summaries readable by authenticated users; full KYC/bank record restricted to store owner & Admin
+      allow read: if isAuthenticated() && (
+        resource.data.status == 'APPROVED' ||
+        resource.data.ownerUid == request.auth.uid ||
+        isVerifiedAdmin()
+      );
+
+      // New seller registrations must start in PENDING status with zero balances
+      allow create: if isAuthenticated()
+        && hasNoProhibitedPaymentSecrets(request.resource.data)
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.status == 'PENDING'
+        && request.resource.data.availableEarningsNgn == 0
+        && request.resource.data.pendingEscrowNgn == 0;
+
+      // Only Admins can approve/suspend stores or modify financial ledger balances & custom commissions
+      allow update: if hasNoProhibitedPaymentSecrets(request.resource.data) && (
+        isVerifiedAdmin() || (
+          isAuthenticated()
+          && resource.data.ownerUid == request.auth.uid
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.availableEarningsNgn == resource.data.availableEarningsNgn
+          && request.resource.data.pendingEscrowNgn == resource.data.pendingEscrowNgn
+          && request.resource.data.totalWithdrawnNgn == resource.data.totalWithdrawnNgn
+          && request.resource.data.customCommissionPercent == resource.data.customCommissionPercent
+        )
+      );
+
+      allow delete: if isVerifiedAdmin();
+    }
+
+    // ===============================================================
+    // Products Collection (/products/{productId})
+    // ===============================================================
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+
+      // Sellers can create products only for stores they own
+      allow create: if isVerifiedAdmin() || (
+        isAuthenticated()
+        && hasNoProhibitedPaymentSecrets(request.resource.data)
+        && request.resource.data.storeId is string
+        && exists(/databases/$(database)/documents/stores/$(request.resource.data.storeId))
+        && get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerUid == request.auth.uid
+        && request.resource.data.basePriceNgn is int
+        && request.resource.data.basePriceNgn > 0
+        && request.resource.data.basePriceNgn <= 500000000
+        && request.resource.data.stockCount is int
+        && request.resource.data.stockCount >= 0
+      );
+
+      // Sellers can update products only within their own store; cannot reassign storeId
+      allow update: if isVerifiedAdmin() || (
+        isAuthenticated()
+        && hasNoProhibitedPaymentSecrets(request.resource.data)
+        && resource.data.storeId == request.resource.data.storeId
+        && exists(/databases/$(database)/documents/stores/$(resource.data.storeId))
+        && get(/databases/$(database)/documents/stores/$(resource.data.storeId)).data.ownerUid == request.auth.uid
+        && request.resource.data.basePriceNgn is int
+        && request.resource.data.basePriceNgn > 0
+        && request.resource.data.basePriceNgn <= 500000000
+        && request.resource.data.stockCount is int
+        && request.resource.data.stockCount >= 0
+      );
+
+      allow delete: if isVerifiedAdmin();
+    }
+
+    // ===============================================================
+    // Orders Collection (/orders/{orderId})
+    // ===============================================================
+    match /orders/{orderId} {
+      // Only the buyer, the fulfilling seller, or an Admin can read an order
+      allow read: if isAuthenticated() && (
+        resource.data.customerUid == request.auth.uid ||
+        resource.data.sellerOwnerUid == request.auth.uid ||
+        isVerifiedAdmin()
+      );
+
+      allow create: if isAuthenticated()
+        && hasNoProhibitedPaymentSecrets(request.resource.data)
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.totalAmountNgn > 0
+        && request.resource.data.escrowReleased == false;
+
+      allow update: if isVerifiedAdmin();
+      allow delete: if false;
+    }
+
+    // ===============================================================
+    // Seller Withdrawals Collection (/withdrawals/{withdrawalId})
+    // ===============================================================
+    match /withdrawals/{withdrawalId} {
+      allow read: if isAuthenticated() && (
+        resource.data.sellerOwnerUid == request.auth.uid ||
+        isVerifiedAdmin()
+      );
+
+      allow create: if isAuthenticated()
+        && hasNoProhibitedPaymentSecrets(request.resource.data)
+        && request.resource.data.sellerOwnerUid == request.auth.uid
+        && request.resource.data.amountNgn > 0
+        && request.resource.data.status == 'PENDING';
+
+      // Only Platform Administrators can approve or reject withdrawal requests
+      allow update: if isVerifiedAdmin();
+      allow delete: if false;
+    }
+
+    // ===============================================================
+    // Product Disputes Collection (/disputes/{disputeId})
+    // ===============================================================
+    match /disputes/{disputeId} {
+      allow read: if isAuthenticated() && (
+        resource.data.customerUid == request.auth.uid ||
+        resource.data.sellerOwnerUid == request.auth.uid ||
+        isVerifiedAdmin()
+      );
+
+      allow create: if isAuthenticated()
+        && hasNoProhibitedPaymentSecrets(request.resource.data)
+        && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.status == 'OPEN';
+
+      allow update: if isVerifiedAdmin();
+      allow delete: if false;
+    }
+
+    // ===============================================================
+    // Financial Ledger Transactions (/transactions/{transactionId})
+    // ===============================================================
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (
+        resource.data.sellerOwnerUid == request.auth.uid ||
+        resource.data.customerUid == request.auth.uid ||
+        isVerifiedAdmin()
+      );
+
+      // Immutable financial ledger: only Admin/server can append; updates and deletes are strictly forbidden
+      allow create: if isVerifiedAdmin() && hasNoProhibitedPaymentSecrets(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ===============================================================
+    // Immutable Administrative & Database Activity Audit Logs (/admin_audit_logs/{auditId})
+    // ===============================================================
+    match /admin_audit_logs/{auditId} {
+      allow read: if isVerifiedAdmin();
+      allow create: if isVerifiedAdmin() && hasNoProhibitedPaymentSecrets(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ===============================================================
+    // Public Product & Profile Media Metadata (/public_media/{fileId})
+    // Separated from Private Verification Documents
+    // ===============================================================
+    match /public_media/{fileId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated()
+        && hasNoProhibitedPaymentSecrets(request.resource.data)
+        && request.resource.data.partition == 'PUBLIC_CATALOG_MEDIA'
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if isVerifiedAdmin() || (isAuthenticated() && resource.data.ownerUid == request.auth.uid);
+    }
+
+    // ===============================================================
+    // Private Verification Vault (/private_verification_vault/{fileId})
+    // Seller Identity Documents & Premises Photos — Admin-Only Access
+    // ===============================================================
+    match /private_verification_vault/{fileId} {
+      // Seller identity documents must NEVER be publicly accessible; ONLY authorized Administrators can read
+      allow read: if isVerifiedAdmin();
+      allow create: if isAuthenticated()
+        && hasNoProhibitedPaymentSecrets(request.resource.data)
+        && request.resource.data.partition == 'PRIVATE_ADMIN_VAULT'
+        && request.resource.data.isEncryptedAtRest == true
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if isVerifiedAdmin();
+    }
+
+    // Default deny all other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

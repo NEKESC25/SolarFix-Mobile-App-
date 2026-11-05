@@ -578,6 +578,126 @@ fun SellerRegistrationContent(
             }
         }
 
+        // Seller Terms of Use, Privacy Policy & Marketplace Agreement Section (Unselected by default)
+        item {
+            var showSellerTermsModal by remember { mutableStateOf(false) }
+            var showSellerPrivacyModal by remember { mutableStateOf(false) }
+            var sellerTermsAccepted by remember { mutableStateOf(false) }
+            var sellerPrivacyAcknowledged by remember { mutableStateOf(false) }
+            var sellerAgreementAccepted by remember { mutableStateOf(false) }
+
+            if (showSellerTermsModal) {
+                TermsOfServiceModalDialog(
+                    entryPointLabel = "Seller Registration & KYB Onboarding",
+                    userIdentifier = businessEmail.ifBlank { "seller_applicant" },
+                    onDismiss = { showSellerTermsModal = false },
+                    onAcceptTerms = { sellerTermsAccepted = true }
+                )
+            }
+            if (showSellerPrivacyModal) {
+                PrivacyPolicyModalDialog(
+                    entryPointLabel = "Seller Registration & KYB Onboarding",
+                    userIdentifier = businessEmail.ifBlank { "seller_applicant" },
+                    onDismiss = { showSellerPrivacyModal = false }
+                )
+            }
+
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("seller_registration_terms_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Gavel,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Seller Legal Acceptance & KYB Consent",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                    Text(
+                        text = "Open and review the documents below before providing affirmative consent:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showSellerTermsModal = true },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("seller_reg_terms_button")
+                        ) {
+                            Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Read Terms", fontSize = 11.sp)
+                        }
+                        OutlinedButton(
+                            onClick = { showSellerPrivacyModal = true },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("seller_reg_privacy_button")
+                        ) {
+                            Icon(Icons.Default.PrivacyTip, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Read Privacy Policy", fontSize = 11.sp)
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = sellerTermsAccepted,
+                            onCheckedChange = { sellerTermsAccepted = it },
+                            modifier = Modifier.testTag("seller_reg_accept_terms_checkbox")
+                        )
+                        Text(
+                            text = "I accept the SolarFix Terms of Use & Terms of Service (v3.2) *",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = sellerPrivacyAcknowledged,
+                            onCheckedChange = { sellerPrivacyAcknowledged = it },
+                            modifier = Modifier.testTag("seller_reg_accept_privacy_checkbox")
+                        )
+                        Text(
+                            text = "I acknowledge the SolarFix Privacy Policy & encrypted PRIVATE_ADMIN_VAULT storage of my KYC documents *",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = sellerAgreementAccepted,
+                            onCheckedChange = { sellerAgreementAccepted = it },
+                            modifier = Modifier.testTag("seller_reg_accept_agreement_checkbox")
+                        )
+                        Text(
+                            text = "I accept Independent Seller Merchant-of-Record duties, anti-counterfeit rules & 5% escrow commission *",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            }
+        }
+
         // Submit Registration Application Button
         item {
             Button(
@@ -603,6 +723,22 @@ fun SellerRegistrationContent(
                         }
                         else -> {
                             validationError = null
+                            // Record seller legal document acceptances
+                            com.example.data.legal.UserConsentAndAuditReportManager.recordDocumentAcceptance(
+                                userId = businessEmail,
+                                documentType = com.example.data.legal.LegalDocumentType.TERMS_OF_SERVICE,
+                                entryPoint = "Seller KYB Registration"
+                            )
+                            com.example.data.legal.UserConsentAndAuditReportManager.recordDocumentAcceptance(
+                                userId = businessEmail,
+                                documentType = com.example.data.legal.LegalDocumentType.PRIVACY_POLICY,
+                                entryPoint = "Seller KYB Registration"
+                            )
+                            com.example.data.legal.UserConsentAndAuditReportManager.recordDocumentAcceptance(
+                                userId = businessEmail,
+                                documentType = com.example.data.legal.LegalDocumentType.SELLER_MARKETPLACE_AGREEMENT,
+                                entryPoint = "Seller KYB Registration"
+                            )
                             viewModel.submitSellerRegistration(
                                 fullNameOrBusinessName = fullNameOrBusinessName,
                                 ownerFullName = ownerFullName.ifBlank { fullNameOrBusinessName },

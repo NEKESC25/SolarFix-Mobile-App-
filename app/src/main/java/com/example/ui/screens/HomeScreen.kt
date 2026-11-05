@@ -41,8 +41,29 @@ fun HomeScreen(
     onOpenFaultLibrary: () -> Unit,
     onLogoutClick: () -> Unit,
     onNavigateToAdmin: (() -> Unit)? = null,
+    onOpenTermsOfService: (() -> Unit)? = null,
+    onOpenPrivacyPolicy: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var showTermsModal by remember { mutableStateOf(false) }
+    var showPrivacyModal by remember { mutableStateOf(false) }
+
+    if (showTermsModal) {
+        TermsOfServiceModalDialog(
+            entryPointLabel = "Application Footer & About SolarFix",
+            userIdentifier = user.email.ifBlank { user.uid },
+            onDismiss = { showTermsModal = false }
+        )
+    }
+
+    if (showPrivacyModal) {
+        PrivacyPolicyModalDialog(
+            entryPointLabel = "Application Footer & About SolarFix",
+            userIdentifier = user.email.ifBlank { user.uid },
+            onDismiss = { showPrivacyModal = false }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -173,6 +194,94 @@ fun HomeScreen(
                     onOpenFaultLibrary = onOpenFaultLibrary,
                     onNavigateToSystemHub = onNavigateToSystemHub
                 )
+            }
+
+            // 5. About SolarFix & Application Legal Footer
+            item {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("home_about_footer_card")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.VerifiedUser,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "About SolarFix & Legal Center",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
+                            Text(
+                                text = "v3.2",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(
+                            text = "SolarFix provides AI diagnostic assistance, seller KYB/KYC verification, and 100% Escrow Payment Protection. Independent verified sellers are the Merchants of Record responsible for product authenticity and OEM warranties.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    if (onOpenTermsOfService != null) {
+                                        onOpenTermsOfService()
+                                    } else {
+                                        showTermsModal = true
+                                    }
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("footer_terms_of_service_button")
+                            ) {
+                                Icon(Icons.Default.Gavel, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Terms of Service", style = MaterialTheme.typography.labelSmall)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    if (onOpenPrivacyPolicy != null) {
+                                        onOpenPrivacyPolicy()
+                                    } else {
+                                        showPrivacyModal = true
+                                    }
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("footer_privacy_policy_button")
+                            ) {
+                                Icon(Icons.Default.PrivacyTip, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Privacy Policy", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
             }
 
             item { Spacer(modifier = Modifier.height(16.dp)) }

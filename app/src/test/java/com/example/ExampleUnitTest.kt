@@ -3162,11 +3162,352 @@ class ExampleUnitTest {
         // 11. Verify Unified Security & Financial Audit Log recorded all events with masked PII
         assertTrue(repo.securityAndFinancialAuditLogFlow.value.size >= 8)
     }
+
+    @Test
+    fun testTermsOfUseAndServiceCompletenessRoleDistinctionAndConsumerRights() {
+        val allSections = com.example.data.legal.TermsOfServiceRepository.allSections
+
+        // 1. Verify all 21 required legal & operational topics are present and ordered 1..21
+        assertEquals(21, com.example.data.legal.TermsSectionTopic.entries.size)
+        assertEquals(21, allSections.size)
+        com.example.data.legal.TermsSectionTopic.entries.forEachIndexed { idx, expectedTopic ->
+            val section = allSections[idx]
+            assertEquals(expectedTopic, section.topic)
+            assertEquals(idx + 1, section.topic.sectionNumber)
+            assertTrue("Section ${expectedTopic.name} summary must not be blank", section.summary.isNotBlank())
+            assertTrue(
+                "Section ${expectedTopic.name} must contain at least 3 detailed legal clauses",
+                section.detailedClauses.size >= 3
+            )
+        }
+
+        // 2. Verify all 21 mandatory topics by explicit retrieval
+        val mandatoryTopics = listOf(
+            com.example.data.legal.TermsSectionTopic.ACCEPTANCE_OF_TERMS,
+            com.example.data.legal.TermsSectionTopic.ELIGIBILITY,
+            com.example.data.legal.TermsSectionTopic.CUSTOMER_RESPONSIBILITIES,
+            com.example.data.legal.TermsSectionTopic.SELLER_RESPONSIBILITIES,
+            com.example.data.legal.TermsSectionTopic.SELLER_REGISTRATION_AND_VERIFICATION,
+            com.example.data.legal.TermsSectionTopic.PRODUCT_LISTING_REQUIREMENTS,
+            com.example.data.legal.TermsSectionTopic.COUNTERFEIT_PROHIBITION,
+            com.example.data.legal.TermsSectionTopic.MARKETPLACE_RULES,
+            com.example.data.legal.TermsSectionTopic.PRICING_AND_PAYMENT_CONDITIONS,
+            com.example.data.legal.TermsSectionTopic.COMMISSION_ARRANGEMENTS,
+            com.example.data.legal.TermsSectionTopic.SELLER_PAYOUT_CONDITIONS,
+            com.example.data.legal.TermsSectionTopic.DELIVERY_RESPONSIBILITIES,
+            com.example.data.legal.TermsSectionTopic.CANCELLATION_POLICIES,
+            com.example.data.legal.TermsSectionTopic.REFUND_AND_RETURN_CONDITIONS,
+            com.example.data.legal.TermsSectionTopic.DISPUTE_RESOLUTION,
+            com.example.data.legal.TermsSectionTopic.PROHIBITED_ACTIVITIES,
+            com.example.data.legal.TermsSectionTopic.ACCOUNT_SUSPENSION_AND_TERMINATION,
+            com.example.data.legal.TermsSectionTopic.INTELLECTUAL_PROPERTY,
+            com.example.data.legal.TermsSectionTopic.LIMITATION_OF_LIABILITY,
+            com.example.data.legal.TermsSectionTopic.CHANGES_TO_TERMS,
+            com.example.data.legal.TermsSectionTopic.CONTACT_AND_COMPLAINT_PROCEDURES
+        )
+        mandatoryTopics.forEach { topic ->
+            val sec = com.example.data.legal.TermsOfServiceRepository.getSection(topic)
+            assertEquals(topic, sec.topic)
+        }
+
+        // 3. Verify clear distinction between SolarFix's responsibilities and Independent Marketplace Sellers
+        val matrix = com.example.data.legal.TermsOfServiceRepository.responsibilityComparisonMatrix
+        assertTrue("Responsibility matrix must cover at least 5 core operational domains", matrix.size >= 5)
+        matrix.forEach { entry ->
+            assertTrue(entry.domain.isNotBlank())
+            assertTrue(entry.solarFixPlatformResponsibility.isNotBlank())
+            assertTrue(entry.independentSellerResponsibility.isNotBlank())
+            assertTrue(entry.customerProtectionGuarantee.isNotBlank())
+        }
+        val sellerRespClauses = com.example.data.legal.TermsOfServiceRepository
+            .getSection(com.example.data.legal.TermsSectionTopic.SELLER_RESPONSIBILITIES)
+            .detailedClauses.joinToString(" ")
+        assertTrue(
+            "Seller Responsibilities must explicitly identify Independent Sellers as the Merchant of Record",
+            sellerRespClauses.contains("Merchant of Record")
+        )
+
+        // 4. Verify non-waiver & preservation of customers' statutory consumer protection and legal rights
+        val banner = com.example.data.legal.TermsOfServiceRepository.STATUTORY_RIGHTS_PRESERVATION_BANNER
+        assertTrue(banner.contains("Federal Competition and Consumer Protection Act (FCCPA) 2018"))
+        assertTrue(banner.contains("Nigeria Data Protection Act (NDPA) 2023"))
+
+        val liabilityClauses = com.example.data.legal.TermsOfServiceRepository
+            .getSection(com.example.data.legal.TermsSectionTopic.LIMITATION_OF_LIABILITY)
+            .detailedClauses.joinToString(" ")
+        assertTrue(
+            "Limitation of Liability must explicitly preserve non-excludable statutory consumer liabilities",
+            liabilityClauses.contains("Nothing in these Terms limits or excludes liability")
+        )
+
+        val disputeClauses = com.example.data.legal.TermsOfServiceRepository
+            .getSection(com.example.data.legal.TermsSectionTopic.DISPUTE_RESOLUTION)
+            .detailedClauses.joinToString(" ")
+        assertTrue(
+            "Dispute Resolution must preserve the customer's right to approach the FCCPC or courts",
+            disputeClauses.contains("court of competent jurisdiction")
+        )
+
+        // 5. Verify keyword search across sections
+        val counterfeitResults = com.example.data.legal.TermsOfServiceRepository.searchSections("counterfeit")
+        assertTrue(counterfeitResults.any { it.topic == com.example.data.legal.TermsSectionTopic.COUNTERFEIT_PROHIBITION })
+
+        val commissionResults = com.example.data.legal.TermsOfServiceRepository.searchSections("5.0% platform commission")
+        assertTrue(commissionResults.any { it.topic == com.example.data.legal.TermsSectionTopic.COMMISSION_ARRANGEMENTS })
+
+        // 6. Verify Terms Acceptance recording & version check across entry points
+        val record = com.example.data.legal.TermsOfServiceRepository.recordTermsAcceptance(
+            userIdOrEmail = "buyer.terms@solarfix.africa",
+            entryPoint = "Registration Screen",
+            acceptedRole = "CUSTOMER"
+        )
+        assertEquals(com.example.data.legal.TermsOfServiceRepository.CURRENT_TERMS_VERSION, record.acceptedVersion)
+        assertTrue(com.example.data.legal.TermsOfServiceRepository.hasAcceptedLatestTerms("buyer.terms@solarfix.africa"))
+        org.junit.Assert.assertNotNull(
+            com.example.data.legal.TermsOfServiceRepository.getAcceptanceRecord("buyer.terms@solarfix.africa")
+        )
+    }
+
+    @Test
+    fun testPrivacyPolicyAllFifteenSectionsEightDomainsDataMinimizationAndUserRights() {
+        val coreSections = com.example.data.legal.PrivacyPolicyAndDataProtectionManager.allCoreSections
+        val domainProvisions = com.example.data.legal.PrivacyPolicyAndDataProtectionManager.specificDomainProvisions
+
+        // 1. Verify all 15 mandatory core Privacy Policy sections are present and ordered 1..15
+        assertEquals(15, com.example.data.legal.PrivacyPolicySectionTopic.entries.size)
+        assertEquals(15, coreSections.size)
+        com.example.data.legal.PrivacyPolicySectionTopic.entries.forEachIndexed { idx, expectedTopic ->
+            val sec = coreSections[idx]
+            assertEquals(expectedTopic, sec.topic)
+            assertEquals(idx + 1, sec.topic.sectionNumber)
+            assertTrue(sec.summary.isNotBlank())
+            assertTrue(sec.detailedClauses.size >= 3)
+            assertTrue(sec.implementationReference.isNotBlank())
+        }
+
+        // 2. Verify all 8 specific data domain provisions (A..H) reflect actual app implementation
+        assertEquals(8, com.example.data.legal.SpecificDataDomainProvision.entries.size)
+        assertEquals(8, domainProvisions.size)
+        val requiredDomains = listOf(
+            com.example.data.legal.SpecificDataDomainProvision.CUSTOMER_INFORMATION,
+            com.example.data.legal.SpecificDataDomainProvision.SELLER_VERIFICATION_DOCUMENTS,
+            com.example.data.legal.SpecificDataDomainProvision.BANK_ACCOUNT_INFORMATION,
+            com.example.data.legal.SpecificDataDomainProvision.PAYMENT_RECORDS,
+            com.example.data.legal.SpecificDataDomainProvision.DELIVERY_ADDRESSES,
+            com.example.data.legal.SpecificDataDomainProvision.AI_TECHNICIAN_INTERACTIONS,
+            com.example.data.legal.SpecificDataDomainProvision.UPLOADED_PHOTOGRAPHS_AND_DOCUMENTS,
+            com.example.data.legal.SpecificDataDomainProvision.MARKETPLACE_TRANSACTION_HISTORY
+        )
+        requiredDomains.forEach { dom ->
+            val detail = com.example.data.legal.PrivacyPolicyAndDataProtectionManager.getDomainProvision(dom)
+            assertEquals(dom, detail.domain)
+            assertTrue("Domain ${dom.name} must list collected fields", detail.exactFieldsCollected.isNotEmpty())
+            assertTrue("Domain ${dom.name} must list excluded data minimization fields", detail.excludedByDataMinimization.isNotEmpty())
+            assertTrue(detail.encryptionAndStorageMechanism.contains("AES-256-GCM") || detail.encryptionAndStorageMechanism.contains("SHA-256"))
+            assertTrue(detail.accessAndSharingPolicy.isNotBlank())
+            assertTrue(detail.retentionPeriod.isNotBlank())
+        }
+
+        // 3. Verify Privacy-by-Design & Data Minimization enforcement rejects unnecessary sensitive fields
+        val cleanPayload = mapOf(
+            "name" to "Engr. Chidi",
+            "email" to "chidi@solarfix.africa",
+            "systemSizeKva" to "8.0"
+        )
+        val cleanAudit = com.example.data.legal.PrivacyPolicyAndDataProtectionManager.enforceDataMinimizationOnPayload(cleanPayload)
+        assertTrue("Clean minimal payload must pass Data Minimization audit", cleanAudit.isCompliant)
+        assertEquals(3, cleanAudit.permittedKeys.size)
+        assertTrue(cleanAudit.rejectedExcessiveOrSensitiveKeys.isEmpty())
+
+        val excessivePayload = mapOf(
+            "name" to "Engr. Chidi",
+            "bvn" to "22113344556",
+            "card_number" to "4532015112830366",
+            "cvv" to "891",
+            "banking_password" to "MyBankPass123",
+            "biometric_template" to "raw_fingerprint_bytes",
+            "religion" to "Private",
+            "contacts_address_book" to "all_contacts"
+        )
+        val excessiveAudit = com.example.data.legal.PrivacyPolicyAndDataProtectionManager.enforceDataMinimizationOnPayload(excessivePayload)
+        org.junit.Assert.assertFalse("Excessive sensitive fields must be flagged and stripped by Data Minimization", excessiveAudit.isCompliant)
+        assertEquals(listOf("name"), excessiveAudit.permittedKeys)
+        assertEquals(7, excessiveAudit.rejectedExcessiveOrSensitiveKeys.size)
+        org.junit.Assert.assertFalse(excessiveAudit.sanitizedPayload.containsKey("bvn"))
+        org.junit.Assert.assertFalse(excessiveAudit.sanitizedPayload.containsKey("card_number"))
+        org.junit.Assert.assertFalse(excessiveAudit.sanitizedPayload.containsKey("cvv"))
+
+        // 4. Verify interactive Data Subject Rights (Access/Export, Correction, Consent Withdrawal, Deletion, Complaint)
+        val testUser = "privacy.user@solarfix.africa"
+
+        // Access / Export right
+        val exportRecord = com.example.data.legal.PrivacyPolicyAndDataProtectionManager.exportUserPersonalDataSnapshot(
+            userIdentifier = testUser,
+            roleName = "CUSTOMER"
+        )
+        assertEquals(com.example.data.legal.DataSubjectRequestType.ACCESS_EXPORT, exportRecord.requestType)
+        assertTrue(exportRecord.resolutionSummary.contains("AES-256-GCM"))
+
+        // Correction right
+        val correctionRecord = com.example.data.legal.PrivacyPolicyAndDataProtectionManager.submitDataCorrectionRequest(
+            userIdentifier = testUser,
+            fieldToCorrect = "Delivery Street Address",
+            updatedValueSummary = "22 Admiralty Way, Lekki Phase 1"
+        )
+        assertEquals(com.example.data.legal.DataSubjectRequestType.CORRECTION, correctionRecord.requestType)
+
+        // Consent withdrawal right
+        val withdrawnState = com.example.data.legal.PrivacyPolicyAndDataProtectionManager.withdrawAllOptionalConsents(testUser)
+        org.junit.Assert.assertFalse(withdrawnState.aiTechnicianDiagnosticHistoryRetention)
+        org.junit.Assert.assertFalse(withdrawnState.localizedSolarIrradianceOptimization)
+        org.junit.Assert.assertFalse(withdrawnState.productSafetyAndFeatureNotifications)
+        assertTrue("Essential escrow/account processing remains active until account deletion", withdrawnState.essentialAccountAndEscrowProcessing)
+
+        // Deletion / Erasure right
+        val deletionRecord = com.example.data.legal.PrivacyPolicyAndDataProtectionManager.submitDataDeletionRequest(
+            userIdentifier = testUser,
+            reason = "Exercising NDPA Section 34(1)(c) right to erasure"
+        )
+        assertEquals(com.example.data.legal.DataSubjectRequestType.DELETION_ERASURE, deletionRecord.requestType)
+        assertTrue(deletionRecord.resolutionSummary.contains("6-year statutory retention"))
+
+        // Privacy Complaint right
+        val complaintRecord = com.example.data.legal.PrivacyPolicyAndDataProtectionManager.submitPrivacyComplaint(
+            userIdentifier = testUser,
+            complaintDetails = "Requesting verification that my KYC ID is strictly in PRIVATE_ADMIN_VAULT"
+        )
+        assertEquals(com.example.data.legal.DataSubjectRequestType.PRIVACY_COMPLAINT, complaintRecord.requestType)
+        assertTrue(complaintRecord.resolutionSummary.contains("NDPC"))
+    }
+
+    @Test
+    fun testUserConsentNonPreselectedLegalAcceptanceLedgerAndSecurityAuditReport() {
+        // 1. Verify registration consent checkboxes are NEVER preselected (all default to false)
+        val initialConsent = com.example.data.legal.UserConsentAndAuditReportManager.createUnselectedRegistrationConsentState()
+        org.junit.Assert.assertFalse("Terms of Service checkbox must NOT be preselected", initialConsent.termsOfServiceAccepted)
+        org.junit.Assert.assertFalse("Privacy Policy checkbox must NOT be preselected", initialConsent.privacyPolicyAcknowledged)
+        org.junit.Assert.assertFalse("Seller Agreement checkbox must NOT be preselected", initialConsent.sellerAgreementAccepted)
+        org.junit.Assert.assertFalse("Optional AI consent checkbox must NOT be preselected", initialConsent.optionalAiDiagnosticHistoryConsent)
+        org.junit.Assert.assertFalse("Optional Safety Alerts checkbox must NOT be preselected", initialConsent.optionalSafetyNotificationsConsent)
+        org.junit.Assert.assertFalse(initialConsent.isCustomerRegistrationConsentValid)
+        org.junit.Assert.assertFalse(initialConsent.isSellerRegistrationConsentValid)
+
+        // 2. Verify registration is rejected if mandatory Terms or Privacy Policy checkboxes are unselected
+        val rejectedMissingTerms = com.example.data.legal.UserConsentAndAuditReportManager
+            .validateAndRecordCustomerRegistrationConsent(
+                userId = "new.customer@solarfix.africa",
+                consentState = initialConsent.copy(termsOfServiceAccepted = false, privacyPolicyAcknowledged = true)
+            )
+        assertTrue("Registration without Terms of Service acceptance must fail", rejectedMissingTerms.isFailure)
+
+        val rejectedMissingPrivacy = com.example.data.legal.UserConsentAndAuditReportManager
+            .validateAndRecordCustomerRegistrationConsent(
+                userId = "new.customer@solarfix.africa",
+                consentState = initialConsent.copy(termsOfServiceAccepted = true, privacyPolicyAcknowledged = false)
+            )
+        assertTrue("Registration without Privacy Policy acknowledgement must fail", rejectedMissingPrivacy.isFailure)
+
+        // 3. Verify affirmative acceptance records User ID, Accepted Document, Document Version, and Acceptance Timestamp
+        val customerId = "affirmative.customer@solarfix.africa"
+        val validCustomerConsent = initialConsent.copy(
+            termsOfServiceAccepted = true,
+            privacyPolicyAcknowledged = true,
+            optionalAiDiagnosticHistoryConsent = true,
+            optionalSafetyNotificationsConsent = false,
+            hasOpenedTermsOfServiceDocument = true,
+            hasOpenedPrivacyPolicyDocument = true
+        )
+        val recordedResult = com.example.data.legal.UserConsentAndAuditReportManager
+            .validateAndRecordCustomerRegistrationConsent(
+                userId = customerId,
+                consentState = validCustomerConsent,
+                entryPoint = "Customer Registration"
+            )
+        assertTrue(recordedResult.isSuccess)
+        val receipts = recordedResult.getOrThrow()
+        assertEquals(3, receipts.size) // Terms + Privacy + Optional AI Diagnostic Consent
+
+        receipts.forEach { rec ->
+            assertEquals(customerId, rec.userId)
+            assertTrue(rec.acceptedDocumentName.isNotBlank())
+            assertTrue(rec.documentVersion.startsWith("2026.11-"))
+            assertTrue(rec.acceptanceTimestampEpochMs > 0L)
+            assertTrue(rec.acceptanceTimestampIso.endsWith("Z"))
+            assertTrue(rec.affirmativeConsentVerified)
+            assertTrue(
+                "Cryptographic SHA-256 receipt integrity hash must be valid",
+                com.example.data.legal.UserConsentAndAuditReportManager.verifyAcceptanceRecordIntegrity(rec)
+            )
+        }
+        assertTrue(
+            com.example.data.legal.UserConsentAndAuditReportManager.hasUserAcceptedCurrentMandatoryDocuments(customerId)
+        )
+
+        // 4. Verify Seller Registration consent validation & recording
+        val sellerId = "verified.vendor@solarfix.africa"
+        val invalidSellerAttempt = com.example.data.legal.UserConsentAndAuditReportManager
+            .validateAndRecordSellerRegistrationConsent(
+                sellerUserIdOrEmail = sellerId,
+                consentState = initialConsent.copy(termsOfServiceAccepted = true, privacyPolicyAcknowledged = true, sellerAgreementAccepted = false)
+            )
+        assertTrue("Seller registration without Seller Marketplace Agreement must fail", invalidSellerAttempt.isFailure)
+
+        val validSellerAttempt = com.example.data.legal.UserConsentAndAuditReportManager
+            .validateAndRecordSellerRegistrationConsent(
+                sellerUserIdOrEmail = sellerId,
+                consentState = initialConsent.copy(termsOfServiceAccepted = true, privacyPolicyAcknowledged = true, sellerAgreementAccepted = true)
+            )
+        assertTrue(validSellerAttempt.isSuccess)
+        assertEquals(3, validSellerAttempt.getOrThrow().size)
+
+        // 5. Verify Security Audit Report contains all 8 required fields for every vulnerability finding
+        val findings = com.example.data.legal.UserConsentAndAuditReportManager.securityAuditFindings
+        assertTrue("Security Audit Report must document at least 12 findings", findings.size >= 12)
+        findings.forEach { finding ->
+            assertTrue(finding.findingId.startsWith("SF-SEC-"))
+            assertTrue("1. Vulnerability discovered must not be blank", finding.vulnerabilityDiscovered.isNotBlank())
+            org.junit.Assert.assertNotNull("2. Severity level must be present", finding.severityLevel)
+            assertTrue("3. Affected component must not be blank", finding.affectedComponent.isNotBlank())
+            assertTrue("4. Potential security impact must not be blank", finding.potentialSecurityImpact.isNotBlank())
+            assertTrue("5. Recommended correction must not be blank", finding.recommendedCorrection.isNotBlank())
+            assertTrue("6. Actual correction implemented must not be blank", finding.actualCorrectionImplemented.isNotBlank())
+            assertTrue("7. Verification test performed must not be blank", finding.verificationTestPerformed.isNotBlank())
+            assertTrue("8. Remaining security concerns must not be blank", finding.remainingSecurityConcerns.isNotBlank())
+            assertTrue(finding.isRemediatedInCodebase)
+        }
+
+        // 6. Execute Post-Remediation Security Assessment across all subsystems
+        val assessment = com.example.data.legal.UserConsentAndAuditReportManager.runPostRemediationSecurityAssessment()
+        assertTrue("All automated post-remediation security checks must pass", assessment.allAutomatedSecurityChecksPassed)
+        assertTrue(assessment.mobilePostureCompliant)
+        assertTrue(assessment.encryptionAndRlsVerified)
+        assertTrue(assessment.fileVaultIsolationVerified)
+        assertTrue(assessment.rateLimitingAndFinancialLedgerVerified)
+        assertTrue(assessment.affirmativeConsentNonPreselectedVerified)
+        assertEquals(findings.size, assessment.remediatedInProjectCount)
+        assertTrue(assessment.externalInfrastructureActionItems.isNotEmpty())
+    }
+
+    @Test
+    fun testArchitectureInspectionSecretRedactionAndContinuousSecurityPosture() {
+        val archReport = com.example.data.legal.UserConsentAndAuditReportManager.inspectArchitectureAndGenerateSafeSecurityReport()
+
+        assertTrue(archReport.frontendTechnologies.isNotEmpty())
+        assertTrue(archReport.backendAndCloudTechnologies.isNotEmpty())
+        assertTrue(archReport.databaseAndAuthArchitecture.isNotEmpty())
+        assertTrue(archReport.apiIntegrations.isNotEmpty())
+        assertTrue(archReport.environmentAndSecretsSummary.isNotEmpty())
+        assertTrue(archReport.hostingAndDeploymentConfig.isNotEmpty())
+        assertTrue("BuildConfig must comply with secret exclusion rules", archReport.buildConfigSecretsCompliant)
+        assertTrue("Generated report must never expose raw secrets", archReport.zeroSecretsExposedInReport)
+        assertTrue(
+            "Report must explicitly state that no system is 100% secure and continuous monitoring is required",
+            archReport.continuousMonitoringDisclaimer.contains("No software application or cloud infrastructure is 100% secure") &&
+                archReport.continuousMonitoringDisclaimer.contains("continuous monitoring")
+        )
+        assertTrue("Manual configuration instructions must be provided", archReport.manualConfigurationInstructions.size >= 6)
+    }
 }
-
-
-
-
 
 
 

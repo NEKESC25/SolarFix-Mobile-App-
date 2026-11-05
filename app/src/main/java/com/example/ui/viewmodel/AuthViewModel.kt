@@ -37,6 +37,12 @@ class AuthViewModel @JvmOverloads constructor(
     val isPasswordVisible = MutableStateFlow(false)
     val isConfirmPasswordVisible = MutableStateFlow(false)
 
+    // Affirmative Consent State (CRITICAL: Strictly unselected / false by default — never preselected)
+    val termsAcceptedInput = MutableStateFlow(false)
+    val privacyAcknowledgedInput = MutableStateFlow(false)
+    val optionalAiConsentInput = MutableStateFlow(false)
+    val optionalSafetyAlertsConsentInput = MutableStateFlow(false)
+
     val pendingVerification = authRepository.pendingVerification
     val lastDispatchedCode = MutableStateFlow<String?>(null)
 
@@ -101,7 +107,8 @@ class AuthViewModel @JvmOverloads constructor(
     }
 
     /**
-     * Initiates sign up by validating inputs and dispatching a 6-digit email verification code.
+     * Initiates sign up by validating inputs, enforcing affirmative non-preselected legal consent,
+     * recording versioned acceptance receipts, and dispatching a 6-digit email verification code.
      */
     fun initiateSignUp(onCodeSent: () -> Unit = {}) {
         val name = nameInput.value.trim()
@@ -124,6 +131,24 @@ class AuthViewModel @JvmOverloads constructor(
         }
         if (password != confirmPassword) {
             _errorMessage.value = "Passwords do not match. Please re-enter."
+            return
+        }
+
+        val consentFormState = com.example.data.legal.RegistrationConsentFormState(
+            termsOfServiceAccepted = termsAcceptedInput.value,
+            privacyPolicyAcknowledged = privacyAcknowledgedInput.value,
+            optionalAiDiagnosticHistoryConsent = optionalAiConsentInput.value,
+            optionalSafetyNotificationsConsent = optionalSafetyAlertsConsentInput.value
+        )
+        val consentValidation = com.example.data.legal.UserConsentAndAuditReportManager
+            .validateAndRecordCustomerRegistrationConsent(
+                userId = email,
+                consentState = consentFormState,
+                entryPoint = "Customer Registration"
+            )
+        if (consentValidation.isFailure) {
+            _errorMessage.value = consentValidation.exceptionOrNull()?.message
+                ?: "Please accept the Terms of Service and acknowledge the Privacy Policy."
             return
         }
 

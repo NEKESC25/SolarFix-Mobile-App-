@@ -42,6 +42,25 @@ fun SystemHubScreen(
 
     val completedCount = viewModel.getCompletedTasksCount()
     val totalCount = maintenanceTasks.size
+    var showTermsModal by remember { mutableStateOf(false) }
+    var showPrivacyModal by remember { mutableStateOf(false) }
+    var termsEntryPoint by remember { mutableStateOf("Account Settings") }
+
+    if (showTermsModal) {
+        TermsOfServiceModalDialog(
+            entryPointLabel = termsEntryPoint,
+            userIdentifier = profile.installerName.ifBlank { "system_hub_user" },
+            onDismiss = { showTermsModal = false }
+        )
+    }
+
+    if (showPrivacyModal) {
+        PrivacyPolicyModalDialog(
+            entryPointLabel = termsEntryPoint,
+            userIdentifier = profile.installerName.ifBlank { "system_hub_user" },
+            onDismiss = { showPrivacyModal = false }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -146,6 +165,129 @@ fun SystemHubScreen(
                 }
             }
 
+            // Account Settings, Privacy & Legal Compliance Card
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("account_settings_legal_card"),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ManageAccounts,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "Account Settings, Privacy & Legal Policies",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Terms of Service, Privacy Policy, Data Rights (DSAR) & Consent Controls",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "Current Legal Documents & Versions",
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "• Terms of Service: v${com.example.data.legal.TermsOfServiceRepository.CURRENT_TERMS_VERSION} (Effective ${com.example.data.legal.TermsOfServiceRepository.EFFECTIVE_DATE})",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                                Text(
+                                    text = "• Privacy Policy: v${com.example.data.legal.PrivacyPolicyAndDataProtectionManager.CURRENT_PRIVACY_POLICY_VERSION} (NDPA 2023 Compliant)",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                                val activeReceipts = com.example.data.legal.UserConsentAndAuditReportManager.allAcceptanceRecordsFlow.collectAsState().value
+                                if (activeReceipts.isNotEmpty()) {
+                                    Text(
+                                        text = "• Latest Acceptance Receipt: ${activeReceipts.first().acceptedDocumentName} (${activeReceipts.first().documentVersion}) at ${activeReceipts.first().acceptanceTimestampIso}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = CleanGreen
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    termsEntryPoint = "Account Settings"
+                                    showTermsModal = true
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("account_settings_terms_button")
+                            ) {
+                                Icon(Icons.Default.Gavel, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Terms of Service",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    termsEntryPoint = "Account Settings"
+                                    showPrivacyModal = true
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("account_settings_privacy_button")
+                            ) {
+                                Icon(Icons.Default.PrivacyTip, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Privacy Policy",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // Maintenance Progress & Tasks Header
             item {
                 Card(
@@ -230,6 +372,53 @@ fun SystemHubScreen(
                     },
                     onSelect = { viewModel.selectTechnician(tech) }
                 )
+            }
+
+            // About SolarFix & Application Footer
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("system_hub_about_footer_card"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                    ),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "About SolarFix",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
+                        Text(
+                            text = "SolarFix operates the AI Solar Technician diagnostic engine and Escrow-Protected Multi-Vendor Marketplace. Independent verified sellers act as Merchants of Record for listed hardware.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(
+                            onClick = {
+                                termsEntryPoint = "About SolarFix Footer"
+                                showTermsModal = true
+                            },
+                            modifier = Modifier.testTag("system_hub_about_footer_terms_button")
+                        ) {
+                            Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("View Terms of Use & Terms of Service")
+                        }
+                    }
+                }
             }
 
             item {

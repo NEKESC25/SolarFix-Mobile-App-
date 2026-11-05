@@ -25,9 +25,11 @@ import com.example.ui.screens.EmailVerificationScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.LoginScreen
 import com.example.ui.screens.MarketplaceScreen
+import com.example.ui.screens.PrivacyPolicyScreen
 import com.example.ui.screens.SignUpScreen
 import com.example.ui.screens.SystemHubScreen
 import com.example.ui.screens.TechnicianScreen
+import com.example.ui.screens.TermsOfServiceScreen
 import com.example.ui.viewmodel.AnalyticsViewModel
 import com.example.ui.viewmodel.AuthViewModel
 import com.example.ui.viewmodel.MarketplaceViewModel
@@ -39,6 +41,8 @@ object SolarfixRoutes {
     const val SIGNUP = "signup"
     const val VERIFY_EMAIL = "verify_email"
     const val DASHBOARD = "dashboard"
+    const val TERMS_OF_SERVICE = "terms_of_service"
+    const val PRIVACY_POLICY = "privacy_policy"
 
     // Backward-compatible alias for existing tests
     const val AUTH = LOGIN
@@ -77,7 +81,9 @@ fun SolarfixApp(
             val currentRoute = navController.currentBackStackEntry?.destination?.route
             if (currentRoute != SolarfixRoutes.LOGIN &&
                 currentRoute != SolarfixRoutes.SIGNUP &&
-                currentRoute != SolarfixRoutes.VERIFY_EMAIL
+                currentRoute != SolarfixRoutes.VERIFY_EMAIL &&
+                currentRoute != SolarfixRoutes.TERMS_OF_SERVICE &&
+                currentRoute != SolarfixRoutes.PRIVACY_POLICY
             ) {
                 navController.navigate(SolarfixRoutes.LOGIN) {
                     popUpTo(0) { inclusive = true }
@@ -134,6 +140,26 @@ fun SolarfixApp(
                     navController.navigate(SolarfixRoutes.SIGNUP) {
                         popUpTo(SolarfixRoutes.VERIFY_EMAIL) { inclusive = true }
                     }
+                }
+            )
+        }
+
+        composable(SolarfixRoutes.TERMS_OF_SERVICE) {
+            TermsOfServiceScreen(
+                entryPointLabel = "SolarFix Legal Center",
+                userIdentifier = currentUser?.email ?: "visitor",
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(SolarfixRoutes.PRIVACY_POLICY) {
+            PrivacyPolicyScreen(
+                entryPointLabel = "SolarFix Privacy Center",
+                userIdentifier = currentUser?.email ?: "visitor",
+                onBackClick = {
+                    navController.popBackStack()
                 }
             )
         }

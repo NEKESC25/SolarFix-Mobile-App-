@@ -301,7 +301,132 @@ fun SignUpScreen(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(20.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Affirmative Legal Consent & Document Review Section (Unselected by default)
+                            val termsAccepted by viewModel.termsAcceptedInput.collectAsStateWithLifecycle()
+                            val privacyAcknowledged by viewModel.privacyAcknowledgedInput.collectAsStateWithLifecycle()
+                            val optionalAiConsent by viewModel.optionalAiConsentInput.collectAsStateWithLifecycle()
+
+                            var showTermsModal by remember { mutableStateOf(false) }
+                            var showPrivacyModal by remember { mutableStateOf(false) }
+                            if (showTermsModal) {
+                                TermsOfServiceModalDialog(
+                                    entryPointLabel = "Account Registration",
+                                    userIdentifier = email.ifBlank { "new_registration_user" },
+                                    onDismiss = { showTermsModal = false },
+                                    onAcceptTerms = { viewModel.termsAcceptedInput.value = true }
+                                )
+                            }
+                            if (showPrivacyModal) {
+                                PrivacyPolicyModalDialog(
+                                    entryPointLabel = "Account Registration",
+                                    userIdentifier = email.ifBlank { "new_registration_user" },
+                                    onDismiss = { showPrivacyModal = false }
+                                )
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "Legal Document Acceptance & Consent (Required *)",
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+
+                                    // 1. Terms of Service Acceptance Checkbox (Unselected by default)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Checkbox(
+                                            checked = termsAccepted,
+                                            onCheckedChange = { viewModel.termsAcceptedInput.value = it },
+                                            modifier = Modifier.testTag("signup_accept_terms_checkbox")
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "I have read and accept the SolarFix Terms of Use & Terms of Service (v3.2) *",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                            TextButton(
+                                                onClick = { showTermsModal = true },
+                                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                                modifier = Modifier.testTag("signup_terms_of_service_button")
+                                            ) {
+                                                Icon(Icons.Default.Gavel, contentDescription = null, modifier = Modifier.size(13.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = "Open & Read Terms of Service",
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // 2. Privacy Policy Acknowledgement Checkbox (Unselected by default)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Checkbox(
+                                            checked = privacyAcknowledged,
+                                            onCheckedChange = { viewModel.privacyAcknowledgedInput.value = it },
+                                            modifier = Modifier.testTag("signup_accept_privacy_checkbox")
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "I have read and acknowledge the SolarFix Privacy Policy & Data Protection Notice (v3.2) *",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                            TextButton(
+                                                onClick = { showPrivacyModal = true },
+                                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                                modifier = Modifier.testTag("signup_privacy_policy_button")
+                                            ) {
+                                                Icon(Icons.Default.PrivacyTip, contentDescription = null, modifier = Modifier.size(13.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = "Open & Read Privacy Policy",
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // 3. Optional Consent Checkbox (Unselected by default)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Checkbox(
+                                            checked = optionalAiConsent,
+                                            onCheckedChange = {
+                                                viewModel.optionalAiConsentInput.value = it
+                                                viewModel.optionalSafetyAlertsConsentInput.value = it
+                                            },
+                                            modifier = Modifier.testTag("signup_optional_consent_checkbox")
+                                        )
+                                        Text(
+                                            text = "Optional: Save encrypted local AI Technician diagnostic history & receive high-voltage safety advisories (revocable anytime)",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
 
                             // Primary "Register & Send Code" CTA Button
                             Button(

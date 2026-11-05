@@ -427,9 +427,18 @@ private fun LoginScreenContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Clean Security & Privacy Reassurance
+        var showLoginTermsModal by remember { mutableStateOf(false) }
+        if (showLoginTermsModal) {
+            TermsOfServiceModalDialog(
+                entryPointLabel = "Login Screen",
+                userIdentifier = email.ifBlank { "login_user" },
+                onDismiss = { showLoginTermsModal = false }
+            )
+        }
+
+        // Clean Security & Privacy Reassurance + Terms Link
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -447,6 +456,23 @@ private fun LoginScreenContent(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
+        }
+
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            TextButton(
+                onClick = { showLoginTermsModal = true },
+                modifier = Modifier.testTag("auth_login_terms_button")
+            ) {
+                Icon(Icons.Default.Gavel, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Terms of Use & Terms of Service",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                )
+            }
         }
     }
 }
@@ -470,6 +496,15 @@ private fun SignUpScreenContent(
 
     val isMinLength = password.length >= 6
     val isMatching = password.isNotEmpty() && password == confirmPassword
+    var showSignUpTermsModal by remember { mutableStateOf(false) }
+
+    if (showSignUpTermsModal) {
+        TermsOfServiceModalDialog(
+            entryPointLabel = "Registration Screen",
+            userIdentifier = email.ifBlank { "signup_user" },
+            onDismiss = { showSignUpTermsModal = false }
+        )
+    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -605,18 +640,60 @@ private fun SignUpScreenContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Terms and Electrical Safety Agreement
-        Text(
-            text = "By registering, you agree to Solarfix High-Voltage Electrical Safety Guidelines and Terms of Service.",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 4.dp)
-        )
+        val termsAccepted by viewModel.termsAcceptedInput.collectAsStateWithLifecycle()
+        val privacyAcknowledged by viewModel.privacyAcknowledgedInput.collectAsStateWithLifecycle()
+        var showSignUpPrivacyModal by remember { mutableStateOf(false) }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        if (showSignUpPrivacyModal) {
+            PrivacyPolicyModalDialog(
+                entryPointLabel = "Registration Screen",
+                userIdentifier = email.ifBlank { "signup_user" },
+                onDismiss = { showSignUpPrivacyModal = false }
+            )
+        }
+
+        // Unselected-by-default Affirmative Consent Checkboxes
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(
+                checked = termsAccepted,
+                onCheckedChange = { viewModel.termsAcceptedInput.value = it },
+                modifier = Modifier.testTag("auth_signup_accept_terms_checkbox")
+            )
+            Text(
+                text = "Accept Terms of Service (v3.2) *",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(
+                onClick = { showSignUpTermsModal = true },
+                modifier = Modifier.testTag("auth_signup_terms_button")
+            ) {
+                Text("Read Terms", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(
+                checked = privacyAcknowledged,
+                onCheckedChange = { viewModel.privacyAcknowledgedInput.value = it },
+                modifier = Modifier.testTag("auth_signup_accept_privacy_checkbox")
+            )
+            Text(
+                text = "Acknowledge Privacy Policy (v3.2) *",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(
+                onClick = { showSignUpPrivacyModal = true },
+                modifier = Modifier.testTag("auth_signup_privacy_button")
+            ) {
+                Text("Read Privacy", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Register Button
         Button(

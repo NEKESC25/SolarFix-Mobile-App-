@@ -54,6 +54,24 @@ fun LoginScreen(
     val successMessage by viewModel.successMessage.collectAsStateWithLifecycle()
 
     val focusManager = LocalFocusManager.current
+    var showTermsModal by remember { mutableStateOf(false) }
+    var showPrivacyModal by remember { mutableStateOf(false) }
+
+    if (showTermsModal) {
+        TermsOfServiceModalDialog(
+            entryPointLabel = "Login Screen",
+            userIdentifier = email.ifBlank { "login_visitor" },
+            onDismiss = { showTermsModal = false }
+        )
+    }
+
+    if (showPrivacyModal) {
+        PrivacyPolicyModalDialog(
+            entryPointLabel = "Login Screen",
+            userIdentifier = email.ifBlank { "login_visitor" },
+            onDismiss = { showPrivacyModal = false }
+        )
+    }
 
     SolarAuthBackdrop(
         modifier = modifier.windowInsetsPadding(WindowInsets.safeDrawing)
@@ -390,7 +408,7 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Security & Encryption Footer
+                    // Security & Encryption Footer + Terms of Use & Terms of Service Access
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
@@ -408,6 +426,49 @@ fun LoginScreen(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = { showTermsModal = true },
+                            modifier = Modifier.testTag("login_terms_of_service_button")
+                        ) {
+                            Icon(
+                                Icons.Default.Gavel,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Terms of Service",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        TextButton(
+                            onClick = { showPrivacyModal = true },
+                            modifier = Modifier.testTag("login_privacy_policy_button")
+                        ) {
+                            Icon(
+                                Icons.Default.PrivacyTip,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Privacy Policy",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
